@@ -10,20 +10,19 @@ import (
 	"sync"
 )
 
-var fileMutex sync.Mutex
-
 type savedFile map[string]string
 
 type fileData struct {
 	path string
 	file savedFile
+	Mu   sync.Mutex
 }
 
 var DaFile fileData
 
 func Init() {
 	f := CreateFile()
-	DaFile = fileData{f, GetData(f)}
+	DaFile = fileData{f, GetData(f), sync.Mutex{}}
 }
 
 func CreateFile() string {
@@ -57,8 +56,8 @@ func GetData(fPath string) savedFile {
 }
 
 func (f *fileData) AddSecret(s string, h string) error {
-	fileMutex.Lock()
-	defer fileMutex.Unlock()
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
 
 	f.file[h] = s
 	bytes, err := json.Marshal(f.file)
@@ -77,8 +76,8 @@ func (f *fileData) AddSecret(s string, h string) error {
 }
 
 func (f *fileData) RemoveSecret(h string) (string, error) {
-	fileMutex.Lock()
-	defer fileMutex.Unlock()
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
 
 	s := f.file[h]
 	if s == "" {
