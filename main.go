@@ -1,8 +1,6 @@
 package main
 
 import (
-	"crypto/md5"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,12 +33,7 @@ type secretResponse struct {
 	Data string `json:"data"`
 }
 
-func getMD5Hash(text string) string {
-	hash := md5.Sum([]byte(text))
-	return hex.EncodeToString(hash[:])
-}
-
-func getSecretHandler(w http.ResponseWriter, r *http.Request, d map[string]string, c func()) {
+func getSecretHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("got / GET request")
 
 	decoder := json.NewDecoder(r.Body)
@@ -57,8 +50,8 @@ func getSecretHandler(w http.ResponseWriter, r *http.Request, d map[string]strin
 		return
 	}
 
-	secretString := d[id.Id]
-	if secretString == "" {
+	secretString, err := file.DaFile.RemoveSecret(id.Id)
+	if err != nil || secretString == "" {
 		w.WriteHeader(http.StatusNotFound)
 		response := secretResponse{
 			"",
@@ -74,11 +67,9 @@ func getSecretHandler(w http.ResponseWriter, r *http.Request, d map[string]strin
 	bytes, _ := json.Marshal(response)
 
 	io.WriteString(w, string(bytes))
-	delete(d, id.Id)
-	c()
 }
 
-func postSecretHandler(w http.ResponseWriter, r *http.Request, d map[string]string, c func()) {
+func postSecretHandler(w http.ResponseWriter, r *http.Request /* , d map[string]string, c func() */) {
 	fmt.Println("got / POST request")
 
 	decoder := json.NewDecoder(r.Body)
@@ -90,15 +81,14 @@ func postSecretHandler(w http.ResponseWriter, r *http.Request, d map[string]stri
 		return
 	}
 
-	h := getMD5Hash(secret.PlainText)
-	d[h] = secret.PlainText
+	h := file.GetMD5Hash(secret.PlainText)
+	file.DaFile.AddSecret(secret.PlainText, h)
 	response := secretId{
 		h,
 	}
 	bytes, _ := json.Marshal(response)
 
 	io.WriteString(w, string(bytes))
-	c()
 }
 
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
@@ -107,19 +97,14 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	f := file.CreateFile()
-	d := file.GetData(f)
+	file.Init()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
-			getSecretHandler(w, r, d, func() {
-				file.SaveSecrets(f, d)
-			})
+			getSecretHandler(w, r)
 		} else if r.Method == http.MethodPost {
-			postSecretHandler(w, r, d, func() {
-				file.SaveSecrets(f, d)
-			})
+			postSecretHandler(w, r)
 		}
 	})
 	mux.HandleFunc("/healthcheck", healthCheckHandler)
