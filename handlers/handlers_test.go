@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -65,5 +66,28 @@ func TestSecretRequestMethods(t *testing.T) {
 	mux.ServeHTTP(writer, request)
 	if writer.Code != http.StatusMethodNotAllowed {
 		t.Error("PUT method is allowed and should not")
+	}
+}
+
+func TestSecretCreationAndRetrieval(t *testing.T) {
+	jsonBody := strings.NewReader(`{ "plain_text": "secret" }`)
+	request, _ := http.NewRequest("POST", "/", jsonBody)
+	writer = httptest.NewRecorder()
+	mux.ServeHTTP(writer, request)
+	if writer.Code != http.StatusOK {
+		t.Error("POST method for adding secret failed")
+	}
+
+	jsonBody = strings.NewReader(`{ "id": "5ebe2294ecd0e0f08eab7690d2a6ee69" }`)
+	request, _ = http.NewRequest("GET", "/", jsonBody)
+	writer = httptest.NewRecorder()
+	mux.ServeHTTP(writer, request)
+	if writer.Code != http.StatusOK {
+		t.Error("GET method to retrieve secret failed")
+	}
+	var secretResponse SecretResponse
+	json.Unmarshal(writer.Body.Bytes(), &secretResponse)
+	if secretResponse.Data != "secret" {
+		t.Error("Secret not retrieved correctly")
 	}
 }

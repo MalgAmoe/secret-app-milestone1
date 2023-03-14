@@ -16,7 +16,7 @@ type secretId struct {
 	Id string `json:"id"`
 }
 
-type secretResponse struct {
+type SecretResponse struct {
 	Data string `json:"data"`
 }
 
@@ -40,7 +40,7 @@ func getSecretHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Println("JSON decoding error", err)
 		w.WriteHeader(http.StatusNotFound)
-		response := secretResponse{
+		response := SecretResponse{
 			"",
 		}
 		bytes, _ := json.Marshal(response)
@@ -51,7 +51,7 @@ func getSecretHandler(w http.ResponseWriter, r *http.Request) {
 	secretString, err := file.DaFile.RemoveSecret(id.Id)
 	if err != nil || secretString == "" {
 		w.WriteHeader(http.StatusNotFound)
-		response := secretResponse{
+		response := SecretResponse{
 			"",
 		}
 		bytes, _ := json.Marshal(response)
@@ -59,7 +59,7 @@ func getSecretHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := secretResponse{
+	response := SecretResponse{
 		secretString,
 	}
 	bytes, _ := json.Marshal(response)
