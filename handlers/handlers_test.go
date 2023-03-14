@@ -91,3 +91,18 @@ func TestSecretCreationAndRetrieval(t *testing.T) {
 		t.Error("Secret not retrieved correctly")
 	}
 }
+
+func TestWrongRetrieval(t *testing.T) {
+	jsonBody := strings.NewReader(`{ "id": "random" }`)
+	request, _ := http.NewRequest("GET", "/", jsonBody)
+	writer = httptest.NewRecorder()
+	mux.ServeHTTP(writer, request)
+	if writer.Code != http.StatusNotFound {
+		t.Error("GET method returns wrong method")
+	}
+	var secretResponse SecretResponse
+	json.Unmarshal(writer.Body.Bytes(), &secretResponse)
+	if secretResponse.Data != "" {
+		t.Error("Secret is not empty")
+	}
+}
