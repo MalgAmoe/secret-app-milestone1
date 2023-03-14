@@ -75,12 +75,25 @@ func postSecretHandler(w http.ResponseWriter, r *http.Request) {
 	err := decoder.Decode(&secret)
 	if err != nil {
 		fmt.Println("JSON decoding error", err)
-		io.WriteString(w, "error decoding the body")
+		response := secretId{
+			"",
+		}
+		bytes, _ := json.Marshal(response)
+		io.WriteString(w, string(bytes))
 		return
 	}
 
 	h := file.GetMD5Hash(secret.PlainText)
-	file.DaFile.AddSecret(secret.PlainText, h)
+	err = file.DaFile.AddSecret(secret.PlainText, h)
+	if err != nil {
+		fmt.Println("Adding secret error", err)
+		response := secretId{
+			"",
+		}
+		bytes, _ := json.Marshal(response)
+		io.WriteString(w, string(bytes))
+		return
+	}
 	response := secretId{
 		h,
 	}
