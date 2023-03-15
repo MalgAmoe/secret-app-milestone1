@@ -1,6 +1,7 @@
 package file
 
 import (
+	"crypto/cipher"
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
@@ -8,36 +9,52 @@ import (
 	"log"
 	"os"
 	"sync"
+
+	"secret-app/crypto"
 )
 
 type savedFile map[string]string
 
 type fileData struct {
-	path string
-	file savedFile
-	Mu   sync.Mutex
+	path  string
+	file  savedFile
+	Mu    sync.Mutex
+	GCM   cipher.AEAD
+	Nonce []byte
 }
 
 var DaFile fileData
 
 func Init() {
-	f := CreateFile()
-	DaFile = fileData{f, GetData(f), sync.Mutex{}}
+	f, gcm, nonce := CreateFile()
+	DaFile = fileData{f, GetData(f), sync.Mutex{}, gcm, nonce}
 }
 
-func CreateFile() string {
+func CreateFile() (string, cipher.AEAD, []byte) {
 	fPath := os.Getenv("DATA_FILE_PATH")
+	password := os.Getenv("PASSWORD")
+	salt := os.Getenv("SALT")
 	if fPath == "" {
 		log.Fatal("DATA_FILE_PATH is not set")
 	}
-	_, err := os.Stat(fPath)
+	if password == "" {
+		log.Fatal("PASSWORD is not set")
+	}
+	if salt == "" {
+		log.Fatal("SALT is not set")
+	}
+	gcm, nonce, err := crypto.InitCrypto(password, salt)
+	if err != nil {
+		log.Fatal("could not initialize crypto primitives")
+	}
+	_, err = os.Stat(fPath)
 	if err != nil {
 		_, err = os.Create(fPath)
 		if err != nil {
 			log.Fatal("Could not create the data file")
 		}
 	}
-	return fPath
+	return fPath, gcm, nonce
 }
 
 func GetData(fPath string) savedFile {
@@ -59,7 +76,8 @@ func (f *fileData) AddSecret(s string, h string) error {
 	f.Mu.Lock()
 	defer f.Mu.Unlock()
 
-	f.file[h] = s
+	encData := crypto.Encrypt(s, f.GCM, f.Nonce)
+	f.file[h] = string(encData)
 	bytes, err := json.Marshal(f.file)
 	if err != nil {
 		fmt.Println("error encoding data", err)
@@ -87,13 +105,18 @@ func (f *fileData) RemoveSecret(h string) (string, error) {
 
 	bytes, err := json.Marshal(f.file)
 	if err != nil {
-		fmt.Println("error encoding data", err)
+		fmt.Println("error encrypt data", err)
 	}
 
 	// TODO: possible internal error here
 	os.WriteFile(f.path, bytes, 0666)
 
-	return s, nil
+	decData, err := crypto.Decrypt([]byte(s), f.GCM)
+	if err != nil {
+		fmt.Println("Could not decrypt data", err)
+	}
+
+	return string(decData), nil
 }
 
 func GetMD5Hash(text string) string {
