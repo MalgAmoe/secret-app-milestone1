@@ -26,6 +26,10 @@ func setUp() {
 
 	os.Setenv("DATA_FILE_PATH", "testMocks.json")
 	defer os.Unsetenv("DATA_FILE_PATH")
+	os.Setenv("PASSWORD", "pass")
+	defer os.Unsetenv("PASSWORD")
+	os.Setenv("SALT", "salt")
+	defer os.Unsetenv("SALT")
 	file.Init()
 }
 
